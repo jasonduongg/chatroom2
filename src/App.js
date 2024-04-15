@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { googleLogout, useGoogleLogin } from '@react-oauth/google';
 
-import Chatroom from "./components/Chatroom/Chatroom.tsx"
+import AdminPanel from "./components/AdminPanel/AdminPanel.tsx"
+import UserPanel from "./components/UserPanel/UserPanel.tsx"
 
 
 function App() {
     const [user, setUser] = useState(null);
     const [profile, setProfile] = useState(null);
+    const [isAdmin, setAdmin] = useState(false);
 
     const login = useGoogleLogin({
         onSuccess: (codeResponse) => setUser(codeResponse),
@@ -24,20 +26,39 @@ function App() {
             .then(response => response.json())
             .then(data => {
                 setProfile(data);
-                addUserToDatabase(data); // Call the function to add user to database
+                addUserToDatabase(data);
+                checkAdminStatus(data)
             })
             .catch(error => console.log(error));
         }
     }, [user]);
 
+    const checkAdminStatus = (profile) => {
+        const { id, email } = profile;
+        fetch(`http://localhost:443/checkAdmin?customer_id=${id}&customer_email=${email}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log(data);
+            if (data.exists) {
+                setAdmin(true);
+            } else {
+                setAdmin(false);
+            }
+        })
+        .catch(error => {
+            console.error('Failed to check admin status:', error);
+            setAdmin(false);
+        });
+    };
+    
+    
     const addUserToDatabase = (googleProfile) => {
         const userData = {
-            CUSTOMER_ID: parseInt(googleProfile.id), // Assuming CUSTOMER_ID is a string
+            CUSTOMER_ID: googleProfile.id, // Assuming CUSTOMER_ID is a string
             CUSTOMER_EMAIL: googleProfile.email,
             CUSTOMER_NAME: googleProfile.name
         };
 
-        console.log(userData)
         fetch('http://localhost:443/setUsers', {
             method: 'POST',
             headers: {
@@ -55,18 +76,27 @@ function App() {
         setProfile(null);
     };
 
+    console.log(isAdmin)
     return (
         <div>
             {profile ? (
                 <div>
-                    {/* <p>ID: {profile.id}</p>
-                    <img src={profile.picture} alt="user" />
-                    <h3>User Logged in</h3>
-                    <p>Name: {profile.name}</p>
-                    <p>Email Address: {profile.email}</p> */}
-
                     <button className="border-2 border-red-400 p-2 "onClick={logOut}>Log out</button>
-                    <Chatroom user={profile} isLoggedIn={true} />
+
+                    <p>ID: {profile.id}</p>
+                    <p>Name: {profile.name}</p>
+                    <p>Email: {profile.email}</p>
+                    <p>Admin Status: {String(isAdmin)}</p>
+            
+                    {isAdmin ? (
+                        <>
+                            <AdminPanel user = {profile}/>
+                        </>
+                    ) : (
+                        <>
+                            <UserPanel user={profile}/>
+                        </>
+                    )}
                 </div>
             ) : (
                 <button onClick={() => login()}>Sign in with Google 🚀</button>
